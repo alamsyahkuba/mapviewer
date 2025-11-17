@@ -29,14 +29,23 @@
         });
 
         const icons = {
-            start_point: "http://maps.google.com/mapfiles/ms/icons/blue-dot.png",
-//             driver_position: {
-//                 url: "/images/truck.png",
-//                 scaledSize: new google.maps.Size(40, 40),
-//             },
-			driver_position: "http://maps.google.com/mapfiles/ms/icons/truck.png",
-            destination_active: "http://maps.google.com/mapfiles/ms/icons/green-dot.png",
-            destination_inactive: "http://maps.google.com/mapfiles/ms/icons/red-dot.png"
+            start_point: {
+                url: "/images/gps_blue.png",
+                scaledSize: new google.maps.Size(20, 30),
+            },
+            driver_position: {
+                url: "/images/truck.png",
+                scaledSize: new google.maps.Size(40, 40),
+            },
+            destination_active: {
+                url: "/images/gps_green.png",
+                scaledSize: new google.maps.Size(20, 30),
+            },
+            destination_inactive: {
+                url: "/images/gps_gray.png",
+                scaledSize: new google.maps.Size(20, 30),
+            },
+// 			driver_position: "http://maps.google.com/mapfiles/ms/icons/truck.png",
         };
 
         async function getETA(origin, dest) {
@@ -154,7 +163,7 @@
                         destinationList.push(pos);
 
                         const label = key.replace(/dest(\d+)/i, 'Destination $1');
-
+                        
                         updateMarker(key, pos, icons.destination, label, 'green', geocoder, infoWindow);
                     });
                 }
