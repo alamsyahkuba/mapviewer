@@ -4,12 +4,12 @@
 @push('scripts')
 <script src="https://maps.googleapis.com/maps/api/js?key={{ env('GOOGLE_MAPS_API_KEY') }}"></script>
 <script>
-	let map, marker;
-	const geocoder = new google.maps.Geocoder();
+    let map, marker;
+    const geocoder = new google.maps.Geocoder();
 
-	async function initMap() {
-		map = new google.maps.Map(document.getElementById('map'), {
-			center: { lat: -7.9666, lng: 112.6326 },
+    async function initMap() {
+        map = new google.maps.Map(document.getElementById('map'), {
+            center: { lat: -7.9666, lng: 112.6326 },
             zoom: 13,
             gestureHandling: "greedy",
             streetViewControl: false,
@@ -18,85 +18,88 @@
             styles: [{ featureType: "poi", stylers: [{ visibility: "off" }] }]
         });
 
-		setupClickListener();
-	}
+        map.addListener('click', handleMapClick);
+    }
 
-	function setupClickListener() {
-        map.addListener('click', (event) => {
-        	const clicked = event.latLng;
-            const lat = event.latLng.lat();
-            const lng = event.latLng.lng();
-    
-            if (!marker) {
-                marker = new google.maps.Marker({ position: event.latLng, map });
-            } else {
-                marker.setPosition(event.latLng);
+    function setMarker(position) {
+        if (!marker) {
+            marker = new google.maps.Marker({ position, map });
+        } else {
+            marker.setPosition(position);
+        }
+    }
+
+    function sendAll(jsonData) {
+        const jsonString = JSON.stringify(jsonData);
+        console.log("[Map Event]:", jsonString);
+
+        if (typeof window.__cef_sendJsonToCEF === "function") {
+            try {
+                window.__cef_sendJsonToCEF(jsonString);
+                console.log("[Bridge] JSON sent to CEF");
+            } catch (err) {
+                console.error("[Bridge] Failed:", err);
             }
+        }
 
-            geocoder.geocode({ location: clicked }, function (results, status) {
-                let address = "";
-                
-                if (status === "OK" && results[0]) {
-                    address = results[0].formatted_address;
-                } else {
-                    console.warn("Geocode failed:", status);
-                }
+        if (typeof window.__cef_sendLatLngToUnity === "function") {
+            window.__cef_sendLatLngToUnity(jsonData.lat, jsonData.lng);
+        }
+    }
 
-                const jsonData = {
-                    type: "click",
-                    lat: lat.toFixed(8),
-                    lng: lng.toFixed(8),
-                    address: address,
-                    timestamp: new Date().toISOString()
-                };
-				const jsonString = JSON.stringify(jsonData);
-                console.log("Map click:", JSON.stringify(jsonData));
-
-             	// --- Priority: send JSON directly to CEF ---
-             	sendJsonToCEF(jsonString);
-            	 // --- Fallback: send to Unity through old bridge ---
-                sendLatLngToUnity(lat, lng);
+    function geocodeAsync(request) {
+        return new Promise((resolve, reject) => {
+            geocoder.geocode(request, (results, status) => {
+                if (status === "OK" && results[0]) return resolve(results[0]);
+                reject(status);
             });
         });
     }
 
-    function searchAddress() {
+    async function handleMapClick(event) {
+        const lat = event.latLng.lat();
+        const lng = event.latLng.lng();
+        setMarker(event.latLng);
+
+        let address = "";
+        try {
+            const result = await geocodeAsync({ location: event.latLng });
+            address = result.formatted_address;
+        } catch (status) {
+            console.warn("Geocode failed:", status);
+        }
+
+        sendAll({
+            type: "click",
+            lat: lat.toFixed(8),
+            lng: lng.toFixed(8),
+            address,
+            timestamp: new Date().toISOString()
+        });
+    }
+
+    async function searchAddress() {
         const input = document.getElementById('addressInput').value;
         if (!input) return;
 
-        geocoder.geocode( {address: input}, function(result, status) {
-			if (status === "OK" && result[0]) {
-				const location = result[0].geometry.location;
-				const lat = location.lat();
-				const lng = location.lng();
+        try {
+            const result = await geocodeAsync({ address: input });
+            const location = result.geometry.location;
 
-				map.setCenter(location);
-				map.setZoom(18);
+            map.setCenter(location);
+            map.setZoom(18);
+            setMarker(location);
 
-				if (!marker) {
-					marker = new google.maps.Marker({ position: location, map });
-				} else {
-					marker.setPosition(location);
-				}
-
-				const jsonData = {
-					type: "search",
-					lat: lat,
-					lng: lng,
-					address: result[0].formatted_address,
-					timestamp: new Date().toISOString()
-				};
-				const jsonString = JSON.stringify(jsonData);
-				console.log("Map search:", JSON.stringify(jsonData));
-				
-				// --- Priority: send JSON directly to CEF ---
-             	sendJsonToCEF(jsonString);
-            	 // --- Fallback: send to Unity through old bridge ---
-                sendLatLngToUnity(lat, lng);
-			} else {
-				showAlert("Geocode failed: " + status);
-			}
-        });
+            sendAll({
+                type: "search",
+                lat: location.lat(),
+                lng: location.lng(),
+                address: result.formatted_address,
+                timestamp: new Date().toISOString()
+            });
+        } catch (status) {
+            showAlert("Geocode failed: " + status);
+        }
     }
 
     function clearSearchAddress() {
@@ -108,29 +111,8 @@
         document.getElementById("alertMessage").innerText = message;
         alertBox.style.display = "block";
     }
-
     function closeAlert() {
         document.getElementById("customAlert").style.display = "none";
-    }
-
-    function sendLatLngToUnity(lat, lng) {
-        if (typeof window.__cef_sendLatLngToUnity === "function") {
-            window.__cef_sendLatLngToUnity(lat, lng);
-            console.log("Sent to Unity via CEF:", lat, lng);
-        } else {
-            console.log("Unity bridge not ready:", lat, lng);
-        }
-    }
-
-    function sendJsonToCEF(jsonString) {
-    	if (typeof window.__cef_sendJsonToCEF === "function") {
-            try {
-                window.__cef_sendJsonToCEF(jsonString);
-                console.log("[Bridge] Sent JSON to CEF successfully.");
-            } catch (err) {
-                console.error("[Bridge] Failed to send JSON to CEF:", err);
-            }
-        }
     }
 
     window.onload = initMap;
