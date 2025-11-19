@@ -19,10 +19,6 @@ class DriverController extends Controller
     public function show($driverId): JsonResponse
     {
         try {
-//             $latest = Driver::where('`Driver Id`', $driverId)
-//             ->latest('created_at')
-//             ->first();
-            
             $latest = DB::table('list driver position')
             ->where('Driver Id', $driverId)
             ->orderByDesc('created_at')
@@ -35,6 +31,7 @@ class DriverController extends Controller
             $origin = json_decode($latest->Origin, true);
             $driver = json_decode($latest->CurrentPosition, true);
             $destinations = (array) json_decode($latest->Destination, true);
+            $stops = (array) json_decode($latest->Stop, true);
             
             if (!$origin || !$driver) {
                 return response()->json(['error' => 'Invalid data format'], 422);
@@ -59,6 +56,12 @@ class DriverController extends Controller
                     'lat' => (float) ($driver['lat'] ?? 0),
                     'lng' => (float) ($driver['lng'] ?? 0),
                 ],
+                'stop_point' => collect($stops)->map(function ($s) {
+                    return [
+                        'lat' => (float) ($s['lat'] ?? 0),
+                        'lng' => (float) ($s['lng'] ?? 0),
+                    ];
+                }),
             ]);
         } catch (\Exception $e) {
             return response()->json([

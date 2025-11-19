@@ -10,11 +10,9 @@ class Driver extends Model
 
     protected $fillable = [
         'Driver Id',
-        'CurrentLatitude',
-        'CurrentLongitude',
-        'OriginLatitude',
-        'OriginLongitude',
-        'DestinationLatitude',
-        'DestinationLongitude',
+        'CurrentPosition',
+        'Origin',
+        'Destination',
+        'Stop',
     ];
 }
